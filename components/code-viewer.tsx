@@ -47,14 +47,14 @@ class PreviewErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="flex h-full w-full items-center justify-center p-6 bg-white">
+        <div className="flex h-full w-full items-center justify-center p-6 bg-background">
           <div className="max-w-md text-center">
-            <div className="text-red-600 font-semibold mb-2">Preview failed to render</div>
-            <p className="text-sm text-gray-600 mb-4">
+            <div className="text-red-600 dark:text-red-400 font-semibold mb-2">Preview failed to render</div>
+            <p className="text-sm text-foreground mb-4">
               The generated code has a syntax error or produced an invalid React element.
               This can happen with partial streams or unusual model output.
             </p>
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-muted-foreground">
               Use <span className="font-medium">Download</span> to inspect the code, or regenerate / refine with an edit prompt.
             </p>
           </div>
@@ -79,7 +79,7 @@ export default function CodeViewer({
   const sandboxCode = normalizeSandboxImports(cleaned);
 
   const appFileContent =
-    sandboxCode || "export default function App() { return <div className='p-8 text-gray-500'>No preview available yet.</div>; }";
+    sandboxCode || "export default function App() { return <div className='p-8 text-muted-foreground'>No preview available yet.</div>; }";
 
   const content = showEditor ? (
     <Sandpack
@@ -162,17 +162,17 @@ const sandboxIndex = dedent`
               padding: '24px',
               fontFamily: 'ui-monospace, monospace',
               fontSize: '13px',
-              color: '#b91c1c',
-              background: '#fef2f2',
+              color: '#f87171',
+              background: '#1f2937',
               height: '100%',
               overflow: 'auto',
             },
           },
           React.createElement('div', { style: { fontWeight: 600, marginBottom: '8px' } }, 'Preview render error'),
-          React.createElement('div', { style: { marginBottom: '12px', color: '#444' } },
+          React.createElement('div', { style: { marginBottom: '12px', color: '#cbd5e1' } },
             'The generated App.tsx could not be rendered (syntax error, invalid component export, or runtime failure).'),
-          React.createElement('pre', { style: { whiteSpace: 'pre-wrap', background: '#fff', padding: '8px', borderRadius: '4px', color: '#111' } }, msg),
-          React.createElement('div', { style: { marginTop: '12px', fontSize: '11px', color: '#666' } },
+          React.createElement('pre', { style: { whiteSpace: 'pre-wrap', background: '#111827', padding: '8px', borderRadius: '4px', color: '#e5e7eb' } }, msg),
+          React.createElement('div', { style: { marginTop: '12px', fontSize: '11px', color: '#94a3b8' } },
             'Fix the code in the editor, use Download, or regenerate with a more specific prompt.')
         );
       }

@@ -3,6 +3,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { XIcon } from 'lucide-react';
+import { useTheme } from 'next-themes';
+import SplashCursor from '@/components/SplashCursor';
 import { PhotoIcon } from '@heroicons/react/20/solid';
 import { FileUploader } from 'react-drag-drop-files';
 import CodeViewer from '@/components/code-viewer';
@@ -198,6 +200,16 @@ export default function UploadComponent() {
   const thinkingRef = useRef<HTMLDivElement>(null);
   const codeBufferRef = useRef('');
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Dark mode fluid background (SplashCursor) — only on homepage in dark theme.
+  // The canvas is pointer-events:none and z-index negative so it acts purely as background.
+  // All UI (including the prompt input / refine textarea and other controls) floats above it.
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  const isDark = mounted && resolvedTheme === 'dark';
 
   // Permanently suppress noisy console spam from common browser extensions
   // (Guideflow WebGL canvas patcher, various "Auto Action"/context menu content scripts, etc.).
@@ -543,6 +555,20 @@ export default function UploadComponent() {
 
   return (
     <div className="flex justify-center mt-2 md:mt-4 mx-2 md:mx-6 gap-3 md:gap-4 flex-col md:flex-row grow">
+      {/* Dark-mode-only fluid cursor background (homepage only).
+          Fixed + z behind everything + pointer-events:none so it is purely decorative background.
+          The fluid responds only to mouse/touch. All panels, the prompt input (refine textarea), buttons etc. float above it untouched. */}
+      {isDark && (
+        <SplashCursor
+          DENSITY_DISSIPATION={3}
+          VELOCITY_DISSIPATION={1}
+          CURL={4}
+          SPLAT_RADIUS={0.15}
+          SPLAT_FORCE={7500}
+          COLOR_UPDATE_SPEED={3}
+          RAINBOW_MODE={true}
+        />
+      )}
       {/* MAIN PREVIEW / HERO AREA */}
       {status === 'initial' || status === 'uploading' || status === 'uploaded' ? (
         <div className="flex-1 w-full flex-col flex justify-center items-center text-center mx-auto py-8 md:py-10">
@@ -552,18 +578,18 @@ export default function UploadComponent() {
               Turn your wireframe into an app
             </h1>
             <div className="max-w-md text-center mx-auto">
-              <p className="text-base md:text-lg text-gray-500 mt-3 md:mt-4 text-center">
+              <p className="text-base md:text-lg text-muted-foreground mt-3 md:mt-4 text-center">
                 Upload a screenshot of your design and we&apos;ll build a working React + Tailwind app for you.
               </p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="relative flex-1 w-full min-h-[52vh] md:min-h-[72vh] md:h-[78vh] overflow-hidden rounded-xl border border-gray-200 bg-white flex flex-col">
+        <div className="relative flex-1 w-full min-h-[52vh] md:min-h-[72vh] md:h-[78vh] overflow-hidden rounded-xl border border-border bg-card flex flex-col dark:bg-card/85 dark:backdrop-blur-sm">
           {/* Top bar: versions + actions (less clutter on mobile) */}
           {hasVersions && (
-            <div className="flex items-center gap-2 border-b px-3 py-2 bg-gray-50/70 flex-wrap">
-              <div className="text-[10px] font-medium uppercase tracking-widest text-gray-500 mr-1">Versions</div>
+            <div className="flex items-center gap-2 border-b px-3 py-2 bg-muted/60 flex-wrap">
+              <div className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground mr-1">Versions</div>
               <div className="flex gap-1.5 overflow-x-auto pb-1 flex-1 min-w-0">
                 {versions.map((v, idx) => {
                   const isActive = selectedVersionId === v.id;
@@ -572,7 +598,7 @@ export default function UploadComponent() {
                     <button
                       key={v.id}
                       onClick={() => selectVersion(v.id)}
-                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition active:scale-[0.985] ${isActive ? 'bg-black text-white border-black' : 'bg-white hover:bg-gray-100 border-gray-200 text-gray-700'}`}
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition active:scale-[0.985] ${isActive ? 'bg-foreground text-background border-foreground' : 'bg-background hover:bg-accent border-border text-foreground'}`}
                     >
                       <Badge variant={isActive ? 'default' : 'outline'} className="px-1 py-0 text-[9px] h-4">v{idx + 1}</Badge>
                       <span className="truncate max-w-[108px]">{label}</span>
@@ -594,10 +620,10 @@ export default function UploadComponent() {
             <CodeViewer code={loading ? sandpackCode : displayedCode} showEditor />
 
             {status === 'creating' && (
-              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
+              <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-background/90 backdrop-blur-sm">
                 <div className="text-center">
-                  <div className="animate-pulse text-lg font-semibold text-gray-900 mb-2">{buildingMessage}</div>
-                  <div className="text-xs text-gray-500">Streaming from vision model…</div>
+                  <div className="animate-pulse text-lg font-semibold text-foreground mb-2">{buildingMessage}</div>
+                  <div className="text-xs text-muted-foreground">Streaming from vision model…</div>
                 </div>
               </div>
             )}
@@ -605,7 +631,7 @@ export default function UploadComponent() {
 
           {/* Bottom bar for mobile/desktop actions */}
           {status === 'created' && generatedCode && (
-            <div className="border-t px-3 py-2 flex items-center gap-2 bg-white flex-wrap">
+            <div className="border-t px-3 py-2 flex items-center gap-2 bg-card flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -622,7 +648,7 @@ export default function UploadComponent() {
                 Download
               </Button>
               <div className="flex-1" />
-              <span className="text-[11px] text-gray-400 hidden sm:inline">Edits create new versions automatically</span>
+              <span className="text-[11px] text-muted-foreground hidden sm:inline">Edits create new versions automatically</span>
             </div>
           )}
         </div>
@@ -633,15 +659,15 @@ export default function UploadComponent() {
         {/* Screenshot */}
         {imageUrl ? (
           <div className="relative">
-            <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50 shadow-sm">
+            <div className="rounded-xl overflow-hidden border border-border bg-muted shadow-sm">
               <img
                 alt="Input screenshot"
                 src={imageUrl}
-                className="w-full max-h-[118px] md:max-h-[132px] object-contain bg-white"
+                className="w-full max-h-[118px] md:max-h-[132px] object-contain bg-background"
               />
             </div>
             <button
-              className="absolute -top-2 -right-2 size-8 rounded-full bg-white border shadow flex items-center justify-center text-gray-700 hover:text-red-600 active:bg-gray-50 transition"
+              className="absolute -top-2 -right-2 size-8 rounded-full bg-background border shadow flex items-center justify-center text-foreground hover:text-red-600 active:bg-muted transition"
               onClick={() => {
                 clearWorkspace();
                 setImageUrl(undefined);
@@ -672,17 +698,17 @@ export default function UploadComponent() {
               multiple={false}
               hoverTitle="Drop here"
             >
-              <div className="flex justify-center rounded-2xl border border-dashed border-gray-300 px-4 py-7 md:py-9 cursor-pointer bg-white active:bg-gray-50 transition">
+              <div className="flex justify-center rounded-2xl border border-dashed border-border px-4 py-7 md:py-9 cursor-pointer bg-card active:bg-muted transition">
                 <div className="text-center">
-                  <PhotoIcon className="mx-auto h-9 w-9 text-gray-300" aria-hidden="true" />
-                  <div className="mt-3 text-sm font-medium text-gray-700">Upload a screenshot</div>
-                  <p className="text-[11px] text-gray-500 mt-0.5">PNG or JPG • drag &amp; drop</p>
+                  <PhotoIcon className="mx-auto h-9 w-9 text-muted-foreground/60" aria-hidden="true" />
+                  <div className="mt-3 text-sm font-medium text-foreground">Upload a screenshot</div>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">PNG or JPG • drag &amp; drop</p>
                 </div>
               </div>
             </FileUploader>
             <div className="text-center mt-2">
               <button
-                className="text-xs text-blue-600 hover:text-blue-700 underline underline-offset-2"
+                className="text-xs text-primary hover:text-primary/80 underline underline-offset-2"
                 onClick={handleSampleImage}
               >
                 Use demo control panel image
@@ -694,22 +720,22 @@ export default function UploadComponent() {
         {/* VISION MODEL OUTPUT — prominently in sidebar per request */}
         <div>
           <div className="flex items-center justify-between mb-1.5 px-0.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.6px] text-gray-500">Vision model output</div>
-            {thinkingText && <div className="text-[10px] text-gray-400">{thinkingText.length} chars</div>}
+            <div className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">Vision model output</div>
+            {thinkingText && <div className="text-[10px] text-muted-foreground/70">{thinkingText.length} chars</div>}
           </div>
           <div
             ref={thinkingRef}
-            className="rounded-xl border bg-gray-50 p-2.5 text-[10px] leading-[1.35] font-mono text-gray-600 min-h-[54px] max-h-[92px] md:max-h-[106px] overflow-auto whitespace-pre-wrap shadow-inner"
+            className="rounded-xl border bg-muted p-2.5 text-[10px] leading-[1.35] font-mono text-muted-foreground min-h-[54px] max-h-[92px] md:max-h-[106px] overflow-auto whitespace-pre-wrap shadow-inner"
           >
             {thinkingText ? thinkingText : 'The model’s step-by-step visual analysis will appear here after you generate.'}
           </div>
         </div>
 
         {/* CONTROLS — shadcn Select + Switch. Compact on mobile */}
-        <div className="space-y-2.5 rounded-2xl border bg-white p-3 shadow-sm">
+        <div className="space-y-2.5 rounded-2xl border bg-card p-3 shadow-sm dark:bg-card/80 dark:backdrop-blur-md">
           {/* Theme */}
           <div>
-            <div className="text-xs font-medium text-gray-600 mb-1.5">Theme</div>
+            <div className="text-xs font-medium text-muted-foreground mb-1.5">Theme</div>
             <Select
               value={theme}
               onValueChange={(val) => setTheme(val as Theme)}
@@ -727,12 +753,12 @@ export default function UploadComponent() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[10px] text-gray-500 mt-1 leading-snug">{THEME_DESCRIPTIONS[theme]}</p>
+            <p className="text-[10px] text-muted-foreground mt-1 leading-snug">{THEME_DESCRIPTIONS[theme]}</p>
           </div>
 
           {/* Model */}
           <div>
-            <div className="text-xs font-medium text-gray-600 mb-1.5">AI Model</div>
+            <div className="text-xs font-medium text-muted-foreground mb-1.5">AI Model</div>
             <Select
               value={model}
               onValueChange={setModel}
@@ -749,14 +775,14 @@ export default function UploadComponent() {
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[10px] text-gray-500 mt-1">{MODEL_OPTIONS.find((m) => m.value === model)?.description}</p>
+            <p className="text-[10px] text-muted-foreground mt-1">{MODEL_OPTIONS.find((m) => m.value === model)?.description}</p>
           </div>
 
           {/* shadcn/ui Toggle — using real shadcn Switch */}
           <div className="flex items-center justify-between pt-1">
             <div>
-              <div className="text-sm font-medium text-gray-700">Use shadcn/ui</div>
-              <div className="text-[10px] text-gray-500 -mt-px">Pre-styled components in output</div>
+              <div className="text-sm font-medium text-foreground">Use shadcn/ui</div>
+              <div className="text-[10px] text-muted-foreground -mt-px">Pre-styled components in output</div>
             </div>
             <Switch
               checked={shadcn}
@@ -770,9 +796,9 @@ export default function UploadComponent() {
 
         {/* EDIT WITH PROMPT — only after first successful generation */}
         {status === 'created' && (
-          <div className="rounded-2xl border bg-white p-3 shadow-sm space-y-2">
+          <div className="rounded-2xl border bg-card p-3 shadow-sm space-y-2 dark:bg-card/80 dark:backdrop-blur-md">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Refine with a prompt</div>
+              <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-1">Refine with a prompt</div>
               <Textarea
                 ref={editTextareaRef}
                 value={editPromptText}
@@ -790,15 +816,15 @@ export default function UploadComponent() {
             >
               {loading ? 'Applying…' : 'Apply edit → new version'}
             </Button>
-            <p className="text-[10px] text-gray-500">Uses the currently visible version as base. Creates a new version in the list above.</p>
+            <p className="text-[10px] text-muted-foreground">Uses the currently visible version as base. Creates a new version in the list above.</p>
           </div>
         )}
 
         {/* VERSIONS LIST (detailed) — always visible in sidebar when present */}
         {hasVersions && (
-          <div className="rounded-2xl border bg-white p-2.5 shadow-sm">
+          <div className="rounded-2xl border bg-card p-2.5 shadow-sm dark:bg-card/80 dark:backdrop-blur-md">
             <div className="flex items-center justify-between px-1 mb-1.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.6px] text-gray-500">History ({versions.length})</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.6px] text-muted-foreground">History ({versions.length})</div>
               {isViewingHistory && (
                 <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => selectVersion(versions[versions.length - 1].id)}>
                   Back to latest
@@ -813,12 +839,12 @@ export default function UploadComponent() {
                     <div
                       key={v.id}
                       onClick={() => selectVersion(v.id)}
-                      className={`group flex items-start justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs cursor-pointer transition ${isActive ? 'border-black bg-black/5' : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'}`}
+                      className={`group flex items-start justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-xs cursor-pointer transition ${isActive ? 'border-foreground bg-foreground/5' : 'border-border hover:border-border/80 hover:bg-muted'}`}
                     >
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <Badge variant={isActive ? 'default' : 'secondary'} className="font-mono text-[10px] px-1 py-px h-4">v{idx + 1}</Badge>
-                          <span className="font-medium text-gray-700 truncate">{v.editPrompt || 'Initial generation from screenshot'}</span>
+                          <span className="font-medium text-foreground truncate">{v.editPrompt || 'Initial generation from screenshot'}</span>
                         </div>
                       </div>
                       <button
@@ -826,7 +852,7 @@ export default function UploadComponent() {
                           e.stopPropagation();
                           onVersionEditFrom(v.id);
                         }}
-                        className="opacity-60 group-hover:opacity-100 text-[10px] underline underline-offset-2 text-gray-500 hover:text-gray-900 whitespace-nowrap"
+                        className="opacity-60 group-hover:opacity-100 text-[10px] underline underline-offset-2 text-muted-foreground hover:text-foreground whitespace-nowrap"
                       >
                         edit from here
                       </button>
