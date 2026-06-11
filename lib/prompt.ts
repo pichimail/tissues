@@ -51,13 +51,75 @@ export default function LandingPage() {
 }
     `,
   },
+  {
+    input: `A clean settings / preferences screen screenshot with toggles and sections`,
+    output: `
+import { useState } from 'react'
+
+export default function SettingsScreen() {
+  const [notifications, setNotifications] = useState(true)
+  const [marketing, setMarketing] = useState(false)
+
+  return (
+    <div className="min-h-screen bg-gray-50 py-10 px-4">
+      <div className="max-w-xl mx-auto">
+        <h1 className="text-3xl font-semibold tracking-tight mb-2">Settings</h1>
+        <p className="text-gray-500 mb-8">Manage your account preferences</p>
+
+        <div className="bg-white rounded-xl border border-gray-200 divide-y">
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">Email notifications</div>
+                <div className="text-sm text-gray-500">Receive emails about your account activity.</div>
+              </div>
+              <button
+                onClick={() => setNotifications(!notifications)}
+                className={\`relative inline-flex h-6 w-11 items-center rounded-full transition-colors \${notifications ? 'bg-black' : 'bg-gray-200'}\`}
+              >
+                <span className={\`inline-block h-5 w-5 transform rounded-full bg-white shadow transition \${notifications ? 'translate-x-6' : 'translate-x-1'}\`} />
+              </button>
+            </div>
+          </div>
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">Marketing emails</div>
+                <div className="text-sm text-gray-500">Receive product updates and offers.</div>
+              </div>
+              <button
+                onClick={() => setMarketing(!marketing)}
+                className={\`relative inline-flex h-6 w-11 items-center rounded-full transition-colors \${marketing ? 'bg-black' : 'bg-gray-200'}\`}
+              >
+                <span className={\`inline-block h-5 w-5 transform rounded-full bg-white shadow transition \${marketing ? 'translate-x-6' : 'translate-x-1'}\`} />
+              </button>
+            </div>
+          </div>
+          <div className="p-6 flex items-center justify-between">
+            <div>
+              <div className="font-medium">Dark mode</div>
+              <div className="text-sm text-gray-500">Use dark theme across the app.</div>
+            </div>
+            <div className="text-xs px-3 py-1 rounded-full bg-gray-100 text-gray-500">Coming soon</div>
+          </div>
+        </div>
+
+        <button className="mt-8 w-full rounded-lg bg-black py-3 text-white text-sm font-medium active:bg-gray-800">
+          Save preferences
+        </button>
+      </div>
+    </div>
+  )
+}
+    `,
+  },
 ];
 
 export function getCodingPrompt(shadcn: boolean) {
   let systemPrompt = `
 You are an expert frontend frontend React developer. You will be given a screenshot of a website from the user, and then you will return code for it using React and Tailwind CSS. Follow the instructions carefully, it is very important for my job. I will tip you $1 million if you do a good job:
 
-- Think carefully step by step about how to recreate the UI described in the prompt.
+- Think carefully step by step about how to recreate the UI described in the prompt. First use your vision capabilities to deeply analyze and note every detail in the screenshot (layout, exact text, colors, spacing, components).
 - Create a React component for whatever the user asked you to create and make sure it can run by itself by using a default export
 - Feel free to have multiple components in the file, but make sure to have one main component that uses all the other components
 - Make sure the website looks exactly like the screenshot described in the prompt.

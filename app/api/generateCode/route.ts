@@ -12,8 +12,6 @@ if (process.env.HELICONE_API_KEY) {
   };
 }
 
-let together = new Together(options);
-
 export async function POST(req: Request) {
   let json = await req.json();
   let result = z
@@ -30,6 +28,11 @@ export async function POST(req: Request) {
 
   let { model, imageUrl, shadcn } = result.data;
   let codingPrompt = getCodingPrompt(shadcn);
+
+  // Instantiate lazily so that TOGETHER_API_KEY is only required at runtime
+  // (important for Vercel deployments where the key is set as an environment
+  // variable and not present during `next build`).
+  const together = new Together(options);
 
   const res = await (together.chat.completions.create as Function)({
     model,

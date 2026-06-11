@@ -2,7 +2,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useS3Upload } from 'next-s3-upload';
 import { PhotoIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import { FileUploader } from 'react-drag-drop-files';
 import CodeViewer from '@/components/code-viewer';
@@ -51,15 +50,20 @@ export default function UploadComponent() {
     }
   }, [thinkingText]);
 
-  const { uploadToS3 } = useS3Upload();
-
-  const handleFileChange = async (file: File) => {
-    let objectUrl = URL.createObjectURL(file);
+  const handleFileChange = (file: File) => {
     setStatus('uploading');
-    setImageUrl(objectUrl);
-    const { url } = await uploadToS3(file);
-    setImageUrl(url);
-    setStatus('uploaded');
+    setThinkingText('');
+
+    // Store image locally using data URL (no S3). The data URL is kept in
+    // component state (browser memory) and sent directly to the backend for
+    // vision inference. Works for both preview and Together AI image_url.
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const dataUrl = event.target?.result as string;
+      setImageUrl(dataUrl);
+      setStatus('uploaded');
+    };
+    reader.readAsDataURL(file);
   };
 
   async function createApp() {
@@ -125,26 +129,45 @@ export default function UploadComponent() {
     }
   }
 
-  function handleSampleImage() {
-    setImageUrl(
-      'https://napkinsdev.s3.us-east-1.amazonaws.com/next-s3-uploads/fc6d6af5-56ba-4245-ae04-1a657cffce9a/Screenshot-2026-04-09-at-13.55.42.png'
-    );
-    setStatus('uploaded');
+  async function handleSampleImage() {
+    setStatus('uploading');
+    setThinkingText('');
+
+    // Load the demo image as a data URL so everything stays in local browser
+    // storage (no S3). The public demo asset is fetched once client-side.
+    try {
+      const demoUrl =
+        'https://napkinsdev.s3.us-east-1.amazonaws.com/next-s3-uploads/fc6d6af5-56ba-4245-ae04-1a657cffce9a/Screenshot-2026-04-09-at-13.55.42.png';
+      const res = await fetch(demoUrl);
+      const blob = await res.blob();
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setImageUrl(event.target?.result as string);
+        setStatus('uploaded');
+      };
+      reader.readAsDataURL(blob);
+    } catch (e) {
+      // Fallback to the remote URL (still works for the server-side vision call)
+      setImageUrl(
+        'https://napkinsdev.s3.us-east-1.amazonaws.com/next-s3-uploads/fc6d6af5-56ba-4245-ae04-1a657cffce9a/Screenshot-2026-04-09-at-13.55.42.png'
+      );
+      setStatus('uploaded');
+    }
   }
 
   return (
-    <div className='flex justify-center mt-5 mx-10 gap-5 sm:flex-row flex-col grow'>
+    <div className='flex justify-center mt-3 md:mt-5 mx-3 md:mx-10 gap-3 md:gap-5 flex-col md:flex-row grow'>
       {status === 'initial' ||
       status === 'uploading' ||
       status === 'uploaded' ? (
         <div className='flex-1 w-full flex-col flex justify-center items-center text-center mx-auto'>
           <div className='max-w-xl text-center'>
-            <img src='/hero-3.svg' alt='Hero' className='mx-auto mb-6' />
-            <h1 className='text-4xl font-bold text-balance tracking-tight'>
+            <img src='/hero-3.svg' alt='Hero' className='mx-auto mb-4 md:mb-6 w-4/5 md:w-auto' />
+            <h1 className='text-3xl md:text-4xl font-bold text-balance tracking-tight'>
               Turn your wireframe into an app
             </h1>
             <div className='max-w-md text-center mx-auto'>
-              <p className='text-lg text-gray-500 mt-4 text-center'>
+              <p className='text-base md:text-lg text-gray-500 mt-3 md:mt-4 text-center'>
                 Upload an image of your website design and we’ll build it for
                 you with React + Tailwind.
               </p>
@@ -152,7 +175,7 @@ export default function UploadComponent() {
           </div>
         </div>
       ) : (
-        <div className='relative flex-1 w-full h-[80vh] overflow-x-hidden'>
+        <div className='relative flex-1 w-full h-[55vh] md:h-[80vh] overflow-x-hidden'>
           <div className='isolate h-full'>
             <CodeViewer code={generatedCode} showEditor />
           </div>
@@ -174,30 +197,32 @@ export default function UploadComponent() {
                 <p className='animate-pulse text-xl font-bold'>
                   {buildingMessage}
                 </p>
-                {thinkingText && (
-                  <div ref={thinkingRef} className='mt-4 max-h-48 w-full max-w-md overflow-y-auto'>
-                    <p className='text-xs text-gray-500 font-mono whitespace-pre-wrap leading-relaxed'>
-                      {thinkingText}
-                    </p>
-                  </div>
-                )}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       )}
-      <div className='w-full max-w-xs gap-4 flex flex-col mx-auto'>
+      <div className='w-full md:max-w-xs gap-3 md:gap-4 flex flex-col mx-auto'>
         {imageUrl ? (
           <div className='relative mt-2'>
-            <div className='rounded-xl'>
+            <div className='rounded-xl overflow-hidden border border-gray-200'>
               <img
                 alt='Screenshot'
                 src={imageUrl}
-                className='w-full group object-cover relative'
+                className='w-full max-h-40 md:max-h-56 object-contain bg-gray-100'
               />
             </div>
-            <button className='absolute size-10 text-gray-900 bg-white hover:text-gray-500 rounded-full -top-3 z-10 -right-3'>
-              <XCircleIcon onClick={() => setImageUrl('')} />
+            <button
+              className='absolute size-10 text-gray-900 bg-white hover:text-gray-500 rounded-full -top-3 z-10 -right-3 flex items-center justify-center'
+              onClick={() => {
+                setImageUrl('');
+                setStatus('initial');
+                setGeneratedCode('');
+                setThinkingText('');
+                setError(null);
+              }}
+            >
+              <XCircleIcon className="size-5" />
             </button>
           </div>
         ) : (
@@ -211,7 +236,7 @@ export default function UploadComponent() {
               multiple={false}
               hoverTitle='Drop here'
             >
-              <div className='mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10 cursor-pointer'>
+              <div className='mt-1 md:mt-2 flex justify-center rounded-lg border border-dashed border-gray-900/25 px-4 py-6 md:px-6 md:py-10 cursor-pointer'>
                 <div className='text-center'>
                   <PhotoIcon
                     className='mx-auto h-12 w-12 text-gray-300'
@@ -242,12 +267,45 @@ export default function UploadComponent() {
           </>
         )}
 
+        {thinkingText && (
+          <div
+            ref={thinkingRef}
+            className="rounded-lg border border-gray-200 bg-gray-50 p-2"
+          >
+            <div className="text-[10px] font-medium uppercase tracking-[0.5px] text-gray-500 mb-0.5">
+              Vision model output
+            </div>
+            <div className="max-h-24 md:max-h-32 overflow-auto text-[10px] leading-snug font-mono text-gray-600 whitespace-pre-wrap">
+              {thinkingText}
+            </div>
+          </div>
+        )}
+
         <div className='flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2'>
           <span className='text-sm font-medium text-gray-600'>AI Model</span>
           <span className='flex items-center gap-2 text-sm font-semibold text-gray-900'>
-            <img src='/kimi.svg' alt='' className='size-5' />
-            Kimi K2.5
+            MOS LLM
           </span>
+        </div>
+
+        <div className='flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2'>
+          <span className='text-sm font-medium text-gray-600'>Use shadcn/ui</span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={shadcn}
+            disabled={status === 'creating' || status === 'uploading'}
+            onClick={() => {
+              if (status !== 'creating' && status !== 'uploading') {
+                setShadcn(!shadcn);
+              }
+            }}
+            className={`relative inline-flex h-[22px] w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-gray-950 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 ${shadcn ? 'bg-gray-900' : 'bg-gray-200'}`}
+          >
+            <span
+              className={`pointer-events-none block h-[18px] w-[18px] rounded-full bg-white shadow ring-0 transition-transform ${shadcn ? 'translate-x-[14px]' : 'translate-x-0'}`}
+            />
+          </button>
         </div>
         <TooltipProvider>
           <Tooltip>

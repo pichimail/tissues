@@ -1,18 +1,16 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
-import Image from 'next/image';
 import Link from 'next/link';
-import Logo from '@/public/biglogo.svg';
 import { Button } from '@/components/ui/button';
-import { GitHubLogoIcon, TwitterLogoIcon } from '@radix-ui/react-icons';
+import { TwitterLogoIcon } from '@radix-ui/react-icons';
 import PlausibleProvider from 'next-plausible';
 
-let title = 'Napkins.dev – Screenshot to code';
+let title = 'Tissues.Dev – Screenshot to code';
 let description = 'Generate your next app with a screenshot and AI';
-let url = 'https://www.napkins.dev/';
-let ogimage = 'https://www.napkins.dev/og-image.png';
-let sitename = 'napkins.dev';
+let url = 'https://www.tissues.dev/';
+let ogimage = 'https://www.tissues.dev/og-image.png';
+let sitename = 'tissues.dev';
 
 export const metadata: Metadata = {
   metadataBase: new URL(url),
@@ -55,26 +53,16 @@ export default function RootLayout({
   return (
     <html lang='en' className='h-full'>
       <head>
-        <PlausibleProvider domain='napkins.dev' />
+        <PlausibleProvider domain='tissues.dev' />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased h-full flex flex-col font-sans`}
       >
         <header className='sm:mx-10 mx-4 mt-5'>
           <div className='flex items-center justify-between'>
-            <Link href='/' className='flex items-center gap-2'>
-              <Image src='/logo.svg' alt='Together AI' width={400} height={50} />
+            <Link href='/' className='flex items-center gap-2 font-semibold text-xl tracking-tight'>
+              Tissues.Dev
             </Link>
-            <Button
-              asChild
-              variant='outline'
-              className='hidden sm:inline-flex gap-2'
-            >
-              <Link href='https://github.com/nutlope/napkins' target='_blank'>
-                <GitHubLogoIcon className='size-4' />
-                GitHub
-              </Link>
-            </Button>
           </div>
         </header>
 
@@ -82,26 +70,13 @@ export default function RootLayout({
 
         <footer className='flex flex-col sm:flex-row items-center justify-between sm:px-10 px-4 pt-20 pb-6 gap-4 sm:gap-0 sm:py-3 text-gray-600 text-sm'>
           <p>
-            Powered by{' '}
-            <a
-              href='https://togetherai.link/'
-              target='_blank'
-              className='font-bold hover:underline underline-offset-4'
-            >
-              Together AI
-            </a>
+            Powered by <span className='font-bold'>MOS LLM</span>
           </p>
           <div className='flex gap-4'>
             <Button asChild variant='ghost' className='gap-2'>
-              <Link href='https://github.com/nutlope/napkins' target='_blank'>
-                <GitHubLogoIcon className='size-4' />
-                GitHub
-              </Link>
-            </Button>
-            <Button asChild variant='ghost' className='gap-2'>
-              <Link href='https://twitter.com/nutlope' target='_blank'>
+              <Link href='https://x.com/dambu07' target='_blank'>
                 <TwitterLogoIcon className='size-4' />
-                Twitter
+                X
               </Link>
             </Button>
           </div>

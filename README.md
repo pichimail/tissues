@@ -1,10 +1,10 @@
-<a href="https://www.napkins.dev">
-  <img alt="Napkins" src="./public/og-image.png">
-  <h1 align="center">Napkins.dev</h1>
+<a href="https://www.tissues.dev">
+  <img alt="Tissues.Dev" src="./public/og-image.png">
+  <h1 align="center">Tissues.Dev</h1>
 </a>
 
 <p align="center">
-  An open source wireframe to app generator. Powered by Kimi K2.5 & Together.ai.
+  An open source wireframe to app generator. Powered by MOS LLM.
 </p>
 
 ## Tech stack
