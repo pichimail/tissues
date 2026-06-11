@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import LoadingDots from '@/components/loading-dots';
 import { readStream } from '@/lib/utils';
-import { stripFences, autoClose } from '@/lib/code-utils';
+import { prepareCodeForPreview } from '@/lib/code-utils';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -198,6 +198,48 @@ export default function UploadComponent() {
   const thinkingRef = useRef<HTMLDivElement>(null);
   const codeBufferRef = useRef('');
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Permanently suppress noisy console spam from common browser extensions
+  // (Guideflow WebGL canvas patcher, various "Auto Action"/context menu content scripts, etc.).
+  // These are not produced by the app — they are content scripts injected into every page.
+  // Filtering here makes the developer console usable while working on this project.
+  useEffect(() => {
+    if (typeof window === 'undefined' || process.env.NODE_ENV === 'production') return;
+
+    const NOISY = /(Guideflow|overrideWebGLContext|contentScript|Auto Action|Detach panel)/i;
+
+    const origLog = console.log;
+    const origWarn = console.warn;
+    const origError = console.error;
+
+    const shouldSuppress = (args: any[]) => {
+      try {
+        const joined = args.map(a => (typeof a === 'string' ? a : (a && a.message) || String(a))).join(' ');
+        return NOISY.test(joined);
+      } catch {
+        return false;
+      }
+    };
+
+    console.log = (...args: any[]) => { if (!shouldSuppress(args)) origLog(...args); };
+    console.warn = (...args: any[]) => { if (!shouldSuppress(args)) origWarn(...args); };
+    console.error = (...args: any[]) => { if (!shouldSuppress(args)) origError(...args); };
+
+    // Also lightly filter uncaught errors reported to window for the same patterns
+    const onError = (e: ErrorEvent) => {
+      if (NOISY.test(e.message || '')) {
+        e.stopImmediatePropagation?.();
+      }
+    };
+    window.addEventListener('error', onError, true);
+
+    return () => {
+      console.log = origLog;
+      console.warn = origWarn;
+      console.error = origError;
+      window.removeEventListener('error', onError, true);
+    };
+  }, []);
 
   const loading = status === 'creating';
 
@@ -399,9 +441,10 @@ export default function UploadComponent() {
       clearInterval(flushInterval);
       flushBufferedCode();
 
-      // Use autoClose (stripFences + stripPostamble + brace repair) so we feed
-      // Sandpack a syntactically complete file whenever possible.
-      let finalCode = autoClose(streamedCode);
+      // Use the full preparation pipeline (autoClose + string repair + last-item recovery)
+      // so the sandbox almost never receives truncated objects / unterminated strings
+      // that previously caused the "Element type is invalid" + babel worker crashes.
+      let finalCode = prepareCodeForPreview(streamedCode);
 
       setGeneratedCode(finalCode);
       setSandpackCode(finalCode);

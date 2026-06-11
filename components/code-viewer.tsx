@@ -12,6 +12,7 @@ import { aquaBlue } from "@codesandbox/sandpack-themes";
 
 import dedent from "dedent";
 import React from "react";
+import { prepareCodeForPreview } from "@/lib/code-utils";
 import "./code-viewer.css";
 
 class PreviewErrorBoundary extends React.Component<
@@ -71,7 +72,15 @@ export default function CodeViewer({
   code: string;
   showEditor?: boolean;
 }) {
-  const sandboxCode = normalizeSandboxImports(code);
+  // Always run the strongest possible cleaning + repair before handing anything to Sandpack.
+  // This is the primary permanent defense against the "Element type is invalid" + babel
+  // truncation errors the user was seeing from streamed / partially generated App.tsx.
+  const cleaned = prepareCodeForPreview(code || "");
+  const sandboxCode = normalizeSandboxImports(cleaned);
+
+  const appFileContent =
+    sandboxCode || "export default function App() { return <div className='p-8 text-gray-500'>No preview available yet.</div>; }";
+
   const content = showEditor ? (
     <Sandpack
       options={{
@@ -81,7 +90,8 @@ export default function CodeViewer({
         ...sharedOptions,
       }}
       files={{
-        "App.tsx": sandboxCode || "// App will appear here after generation",
+        "/App.tsx": appFileContent,
+        "/index.tsx": sandboxIndex,
         ...sharedFiles,
       }}
       {...sharedProps}
@@ -89,7 +99,8 @@ export default function CodeViewer({
   ) : (
     <SandpackProvider
       files={{
-        "App.tsx": sandboxCode || "export default function App() { return <div />; }",
+        "/App.tsx": appFileContent,
+        "/index.tsx": sandboxIndex,
         ...sharedFiles,
       }}
       className="flex h-full w-full grow flex-col justify-center"
@@ -112,6 +123,73 @@ function normalizeSandboxImports(source: string) {
     .replace(/from\s+(['"])@\/([^'"]+)\1/g, 'from $1/$2$1')
     .replace(/import\s+(['"])@\/([^'"]+)\1/g, 'import $1/$2$1');
 }
+
+// This is the *real* entry point we control inside the Sandpack preview.
+// By providing our own index.tsx we get to wrap the (potentially broken) generated
+// App inside a boundary that lives in the *same* React instance as the preview.
+// This catches "Element type is invalid", bad default exports, render-time crashes etc.
+// inside the sandbox instead of letting them become loud uncaught errors +
+// "Could not consume error" spam in the parent console.
+const sandboxIndex = dedent`
+  import React from 'react';
+  import { createRoot } from 'react-dom/client';
+  import App from './App';
+
+  class SandboxErrorBoundary extends React.Component<
+    { children: React.ReactNode },
+    { hasError: boolean; error?: any }
+  > {
+    constructor(props: any) {
+      super(props);
+      this.state = { hasError: false };
+    }
+    static getDerivedStateFromError(error: any) {
+      return { hasError: true, error };
+    }
+    componentDidCatch(error: any, info: any) {
+      // Keep noise low. The parent already has its own boundary + we only debug-log here.
+      if (typeof window !== 'undefined' && (window as any).__SANDBOX_DEBUG__) {
+        console.debug('[Sandpack inner boundary]', error, info);
+      }
+    }
+    render() {
+      if (this.state.hasError) {
+        const msg = this.state.error?.message || String(this.state.error || 'Unknown error');
+        return React.createElement(
+          'div',
+          {
+            style: {
+              padding: '24px',
+              fontFamily: 'ui-monospace, monospace',
+              fontSize: '13px',
+              color: '#b91c1c',
+              background: '#fef2f2',
+              height: '100%',
+              overflow: 'auto',
+            },
+          },
+          React.createElement('div', { style: { fontWeight: 600, marginBottom: '8px' } }, 'Preview render error'),
+          React.createElement('div', { style: { marginBottom: '12px', color: '#444' } },
+            'The generated App.tsx could not be rendered (syntax error, invalid component export, or runtime failure).'),
+          React.createElement('pre', { style: { whiteSpace: 'pre-wrap', background: '#fff', padding: '8px', borderRadius: '4px', color: '#111' } }, msg),
+          React.createElement('div', { style: { marginTop: '12px', fontSize: '11px', color: '#666' } },
+            'Fix the code in the editor, use Download, or regenerate with a more specific prompt.')
+        );
+      }
+      return this.props.children;
+    }
+  }
+
+  const rootEl = document.getElementById('root')!;
+  const root = createRoot(rootEl);
+  root.render(
+    React.createElement(
+      React.StrictMode,
+      null,
+      React.createElement(SandboxErrorBoundary, null, React.createElement(App))
+    )
+  );
+`;
 
 const sharedProps = {
   template: "react-ts",
