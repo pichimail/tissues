@@ -1,4 +1,4 @@
-import { getCodingPrompt } from '@/lib/prompt';
+import { getCodingPrompt, getEditPrompt, type Theme } from '@/lib/prompt';
 
 import Together from 'together-ai';
 import { z } from 'zod';
@@ -12,6 +12,8 @@ if (process.env.HELICONE_API_KEY) {
   };
 }
 
+const ThemeEnum = z.enum(['default', 'dark', 'minimal', 'vibrant', 'corporate']);
+
 export async function POST(req: Request) {
   try {
     const json = await req.json();
@@ -20,6 +22,9 @@ export async function POST(req: Request) {
         model: z.string(),
         imageUrl: z.string(),
         shadcn: z.boolean().default(false),
+        theme: ThemeEnum.default('default'),
+        previousCode: z.string().optional(),
+        editPrompt: z.string().optional(),
       })
       .safeParse(json);
 
@@ -27,8 +32,12 @@ export async function POST(req: Request) {
       return new Response(result.error.message, { status: 422 });
     }
 
-    const { model, imageUrl, shadcn } = result.data;
-    const codingPrompt = getCodingPrompt(shadcn);
+    const { model, imageUrl, shadcn, theme, previousCode, editPrompt } = result.data;
+    const isEdit = Boolean(previousCode && editPrompt);
+
+    const codingPrompt = isEdit
+      ? getEditPrompt(shadcn, theme as Theme, previousCode!, editPrompt!)
+      : getCodingPrompt(shadcn, theme as Theme);
 
     const apiKey = process.env.TOGETHER_API_KEY;
     if (!apiKey) {
@@ -50,7 +59,7 @@ export async function POST(req: Request) {
 
     const togetherRes = await (together.chat.completions.create as any)({
       model,
-      temperature: 0.2,
+      temperature: isEdit ? 0.25 : 0.2,
       max_tokens: 65536,
       stream: true,
       reasoning: { enabled: false },
