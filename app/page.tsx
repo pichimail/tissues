@@ -86,7 +86,18 @@ export default function UploadComponent() {
         }),
       });
 
-      if (!res.ok) throw new Error(res.statusText);
+      if (!res.ok) {
+        let errorMsg = res.statusText || 'Request failed';
+        try {
+          const errBody = await res.json();
+          errorMsg = errBody?.error || errBody?.message || errorMsg;
+        } catch {
+          try {
+            errorMsg = await res.text();
+          } catch {}
+        }
+        throw new Error(errorMsg);
+      }
       if (!res.body) throw new Error('No response body');
 
       codeBufferRef.current = '';

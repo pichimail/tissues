@@ -13,68 +13,81 @@ if (process.env.HELICONE_API_KEY) {
 }
 
 export async function POST(req: Request) {
-  let json = await req.json();
-  let result = z
-    .object({
-      model: z.string(),
-      imageUrl: z.string(),
-      shadcn: z.boolean().default(false),
-    })
-    .safeParse(json);
+  try {
+    const json = await req.json();
+    const result = z
+      .object({
+        model: z.string(),
+        imageUrl: z.string(),
+        shadcn: z.boolean().default(false),
+      })
+      .safeParse(json);
 
-  if (result.error) {
-    return new Response(result.error.message, { status: 422 });
-  }
+    if (result.error) {
+      return new Response(result.error.message, { status: 422 });
+    }
 
-  let { model, imageUrl, shadcn } = result.data;
-  let codingPrompt = getCodingPrompt(shadcn);
+    const { model, imageUrl, shadcn } = result.data;
+    const codingPrompt = getCodingPrompt(shadcn);
 
-  // Instantiate lazily so that TOGETHER_API_KEY is only required at runtime
-  // (important for Vercel deployments where the key is set as an environment
-  // variable and not present during `next build`).
-  const together = new Together(options);
+    const apiKey = process.env.TOGETHER_API_KEY;
+    if (!apiKey) {
+      console.error('Missing TOGETHER_API_KEY');
+      return new Response(
+        JSON.stringify({
+          error:
+            'TOGETHER_API_KEY environment variable is not set. Add it in your Vercel project settings (or .env.local).',
+        }),
+        {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
-  const res = await (together.chat.completions.create as Function)({
-    model,
-    temperature: 0.2,
-    max_tokens: 65536,
-    stream: true,
-    reasoning: { enabled: false },
-    messages: [
-      {
-        role: 'user',
-        content: [
-          { type: 'text', text: codingPrompt },
-          {
-            type: 'image_url',
-            image_url: {
-              url: imageUrl,
+    // Instantiate inside the handler (lazy) so the key is only needed at runtime.
+    const together = new Together({ ...options, apiKey });
+
+    const togetherRes = await (together.chat.completions.create as any)({
+      model,
+      temperature: 0.2,
+      max_tokens: 65536,
+      stream: true,
+      reasoning: { enabled: false },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: codingPrompt },
+            {
+              type: 'image_url',
+              image_url: { url: imageUrl },
             },
-          },
-        ],
-      },
-    ],
-  });
+          ],
+        },
+      ],
+    });
 
-  let sentThinking = false;
-  let sentDoneThinking = false;
-  let textStream = res
-    .toReadableStream()
-    .pipeThrough(new TextDecoderStream())
-    .pipeThrough(
-      new TransformStream({
-        transform(chunk, controller) {
-          if (chunk) {
+    let sentThinking = false;
+    let sentDoneThinking = false;
+
+    const textStream = togetherRes
+      .toReadableStream()
+      .pipeThrough(new TextDecoderStream())
+      .pipeThrough(
+        new TransformStream({
+          transform(chunk, controller) {
+            if (!chunk) return;
             try {
-              let parsed = JSON.parse(chunk);
-              let choice = parsed.choices?.[0];
+              const parsed = JSON.parse(chunk);
+              const choice = parsed.choices?.[0];
               if (!choice) return;
 
               if (choice.finish_reason) {
                 console.log('Stream finished:', choice.finish_reason);
               }
 
-              let reasoning = choice.delta?.reasoning_content || choice.delta?.reasoning;
+              const reasoning = choice.delta?.reasoning_content || choice.delta?.reasoning;
               if (reasoning) {
                 if (!sentThinking) {
                   sentThinking = true;
@@ -84,7 +97,7 @@ export async function POST(req: Request) {
                 return;
               }
 
-              let text = choice.delta?.content || choice.text;
+              const text = choice.delta?.content || choice.text;
               if (text) {
                 if (sentThinking && !sentDoneThinking) {
                   sentDoneThinking = true;
@@ -92,20 +105,25 @@ export async function POST(req: Request) {
                 }
                 controller.enqueue(text);
               }
-            } catch (error) {
-              console.error(error);
+            } catch (err) {
+              console.error('Stream chunk parse error:', err);
             }
-          }
-        },
-      })
-    )
-    .pipeThrough(new TextEncoderStream());
+          },
+        })
+      )
+      .pipeThrough(new TextEncoderStream());
 
-  return new Response(textStream, {
-    headers: new Headers({
-      'Cache-Control': 'no-cache',
-    }),
-  });
+    return new Response(textStream, {
+      headers: { 'Cache-Control': 'no-cache' },
+    });
+  } catch (error: any) {
+    console.error('Error in /api/generateCode:', error);
+    const message = error?.message || 'Internal server error while generating code';
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
 }
 
 export const runtime = 'edge';
