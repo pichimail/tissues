@@ -1208,6 +1208,11 @@ export default function SplashCursor({
 
     // Mouse / touch handlers (component manages its own interaction surface via window events)
     const handleMouseDown = (e: MouseEvent) => {
+      // Only react to the primary (left) mouse button.
+      // This enables native right-click context menu (Inspect, Copy, etc.) on the homepage.
+      // Right-clicks (and middle-click) should pass through for standard browser behavior.
+      if (e.button !== 0) return;
+
       const pointer = pointers[0];
       const posX = scaleByPixelRatio(e.clientX);
       const posY = scaleByPixelRatio(e.clientY);
