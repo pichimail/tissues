@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from 'react';
 import { PhotoIcon, XCircleIcon } from '@heroicons/react/20/solid';
 import { FileUploader } from 'react-drag-drop-files';
 import CodeViewer from '@/components/code-viewer';
-import { AnimatePresence, motion } from 'framer-motion';
 import ShimmerButton from '@/components/ui/shimmerbutton';
 import {
   Tooltip,
@@ -17,7 +16,77 @@ import LoadingDots from '@/components/loading-dots';
 import { readStream } from '@/lib/utils';
 import { stripFences } from '@/lib/code-utils';
 
-const KIMI_MODEL = 'moonshotai/Kimi-K2.5';
+const DEFAULT_MODEL = 'Qwen/Qwen3.6-Plus';
+const WORKSPACE_STORAGE_KEY = 'tissues.workspace.v1';
+const MODEL_OPTIONS = [
+  {
+    value: 'Qwen/Qwen3.6-Plus',
+    label: 'Qwen3.6-Plus',
+    description: 'Best default for UI screenshots',
+  },
+  {
+    value: 'Qwen/Qwen3.7-Max',
+    label: 'Qwen3.7-Max',
+    description: 'Higher-end reasoning and coding',
+  },
+  {
+    value: 'moonshotai/Kimi-K2.6',
+    label: 'Kimi K2.6',
+    description: 'Vision-capable alternative',
+  },
+] as const;
+
+type WorkspaceSnapshot = {
+  imageUrl?: string;
+  generatedCode?: string;
+  shadcn?: boolean;
+  thinkingText?: string;
+  model?: string;
+};
+
+function loadWorkspace(): WorkspaceSnapshot | null {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = localStorage.getItem(WORKSPACE_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw) as WorkspaceSnapshot;
+  } catch {
+    return null;
+  }
+}
+
+function saveWorkspace(snapshot: WorkspaceSnapshot) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    const hasContent =
+      Boolean(snapshot.imageUrl) ||
+      Boolean(snapshot.generatedCode) ||
+      Boolean(snapshot.thinkingText) ||
+      snapshot.shadcn === true ||
+      Boolean(snapshot.model && snapshot.model !== DEFAULT_MODEL);
+
+    if (!hasContent) {
+      localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+      return;
+    }
+
+    localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify(snapshot));
+  } catch {
+    // Ignore quota or storage access issues so the app still works.
+  }
+}
+
+function clearWorkspace() {
+  if (typeof window === 'undefined') return;
+
+  try {
+    localStorage.removeItem(WORKSPACE_STORAGE_KEY);
+  } catch {
+    // Ignore storage access issues.
+  }
+}
 
 export default function UploadComponent() {
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
@@ -26,15 +95,42 @@ export default function UploadComponent() {
   >('initial');
   const [generatedCode, setGeneratedCode] = useState('');
   const [shadcn, setShadcn] = useState(false);
+  const [model, setModel] = useState(DEFAULT_MODEL);
   const [buildingMessage, setBuildingMessage] = useState(
     'Building your app...'
   );
   const [error, setError] = useState<string | null>(null);
   const [thinkingText, setThinkingText] = useState('');
+  const [hydrated, setHydrated] = useState(false);
   const thinkingRef = useRef<HTMLDivElement>(null);
   const codeBufferRef = useRef('');
 
   let loading = status === 'creating';
+
+  useEffect(() => {
+    const snapshot = loadWorkspace();
+    if (snapshot) {
+      setImageUrl(snapshot.imageUrl);
+      setGeneratedCode(snapshot.generatedCode ?? '');
+      setShadcn(snapshot.shadcn ?? false);
+      setThinkingText(snapshot.thinkingText ?? '');
+      setModel(snapshot.model ?? DEFAULT_MODEL);
+      setStatus(snapshot.generatedCode ? 'created' : snapshot.imageUrl ? 'uploaded' : 'initial');
+    }
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
+    saveWorkspace({
+      imageUrl: imageUrl || undefined,
+      generatedCode: generatedCode || undefined,
+      shadcn,
+      thinkingText: thinkingText || undefined,
+      model: model || undefined,
+    });
+  }, [generatedCode, hydrated, imageUrl, model, shadcn, thinkingText]);
 
   useEffect(() => {
     let el = document.querySelector('.cm-scroller');
@@ -53,6 +149,8 @@ export default function UploadComponent() {
   const handleFileChange = (file: File) => {
     setStatus('uploading');
     setThinkingText('');
+    setGeneratedCode('');
+    setError(null);
 
     // Store image locally using data URL (no S3). The data URL is kept in
     // component state (browser memory) and sent directly to the backend for
@@ -80,7 +178,7 @@ export default function UploadComponent() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: KIMI_MODEL,
+          model,
           shadcn,
           imageUrl,
         }),
@@ -143,12 +241,13 @@ export default function UploadComponent() {
   async function handleSampleImage() {
     setStatus('uploading');
     setThinkingText('');
+    setGeneratedCode('');
+    setError(null);
 
-    // Load the demo image as a data URL so everything stays in local browser
-    // storage (no S3). The public demo asset is fetched once client-side.
+    // Load the demo image from the local public folder and convert it to a
+    // data URL so the browser keeps the complete testing flow self-contained.
     try {
-      const demoUrl =
-        'https://napkinsdev.s3.us-east-1.amazonaws.com/next-s3-uploads/fc6d6af5-56ba-4245-ae04-1a657cffce9a/Screenshot-2026-04-09-at-13.55.42.png';
+      const demoUrl = '/control-panel-demo.png';
       const res = await fetch(demoUrl);
       const blob = await res.blob();
       const reader = new FileReader();
@@ -158,11 +257,10 @@ export default function UploadComponent() {
       };
       reader.readAsDataURL(blob);
     } catch (e) {
-      // Fallback to the remote URL (still works for the server-side vision call)
-      setImageUrl(
-        'https://napkinsdev.s3.us-east-1.amazonaws.com/next-s3-uploads/fc6d6af5-56ba-4245-ae04-1a657cffce9a/Screenshot-2026-04-09-at-13.55.42.png'
+      setError(
+        e instanceof Error ? e.message : 'Could not load the sample image'
       );
-      setStatus('uploaded');
+      setStatus('initial');
     }
   }
 
@@ -191,26 +289,13 @@ export default function UploadComponent() {
             <CodeViewer code={generatedCode} showEditor />
           </div>
 
-          <AnimatePresence>
-            {status === 'creating' && (
-              <motion.div
-                initial={{ x: '80%' }}
-                animate={{ x: '0%' }}
-                exit={{ x: '80%' }}
-                transition={{
-                  type: 'spring',
-                  bounce: 0,
-                  duration: 0.85,
-                  delay: 0.1,
-                }}
-                className='absolute inset-x-0 bottom-0 top-1/2 flex flex-col items-center justify-center rounded-r border border-gray-400 bg-gradient-to-br from-gray-100 to-gray-300 md:inset-y-0 md:left-1/2 md:right-0 p-6'
-              >
-                <p className='animate-pulse text-xl font-bold'>
-                  {buildingMessage}
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {status === 'creating' && (
+            <div className='absolute inset-x-0 bottom-0 top-1/2 flex flex-col items-center justify-center rounded-r border border-gray-400 bg-gradient-to-br from-gray-100 to-gray-300 md:inset-y-0 md:left-1/2 md:right-0 p-6'>
+              <p className='animate-pulse text-xl font-bold'>
+                {buildingMessage}
+              </p>
+            </div>
+          )}
         </div>
       )}
       <div className='w-full md:max-w-xs gap-3 md:gap-4 flex flex-col mx-auto'>
@@ -226,10 +311,12 @@ export default function UploadComponent() {
             <button
               className='absolute size-10 text-gray-900 bg-white hover:text-gray-500 rounded-full -top-3 z-10 -right-3 flex items-center justify-center'
               onClick={() => {
-                setImageUrl('');
+                clearWorkspace();
+                setImageUrl(undefined);
                 setStatus('initial');
                 setGeneratedCode('');
                 setThinkingText('');
+                setShadcn(false);
                 setError(null);
               }}
             >
@@ -293,10 +380,26 @@ export default function UploadComponent() {
         )}
 
         <div className='flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2'>
-          <span className='text-sm font-medium text-gray-600'>AI Model</span>
-          <span className='flex items-center gap-2 text-sm font-semibold text-gray-900'>
-            MOS LLM
-          </span>
+          <label className='text-sm font-medium text-gray-600' htmlFor='model-select'>
+            AI Model
+          </label>
+          <select
+            id='model-select'
+            value={model}
+            disabled={status === 'creating' || status === 'uploading'}
+            onChange={(event) => setModel(event.target.value)}
+            className='max-w-[55%] rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm font-semibold text-gray-900 shadow-sm outline-none transition focus:border-gray-400 disabled:cursor-not-allowed disabled:opacity-60'
+          >
+            {MODEL_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className='-mt-2 text-[11px] leading-snug text-gray-500'>
+          {MODEL_OPTIONS.find((option) => option.value === model)?.description}
         </div>
 
         <div className='flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2'>
@@ -318,6 +421,25 @@ export default function UploadComponent() {
             />
           </button>
         </div>
+
+        <button
+          type='button'
+          className='rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:border-gray-300 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-50'
+          disabled={status === 'creating' || status === 'uploading'}
+          onClick={() => {
+            clearWorkspace();
+            setImageUrl(undefined);
+            setGeneratedCode('');
+            setThinkingText('');
+            setError(null);
+            setShadcn(false);
+            setModel(DEFAULT_MODEL);
+            setStatus('initial');
+          }}
+        >
+          Reset local workspace
+        </button>
+
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>

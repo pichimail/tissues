@@ -12,7 +12,8 @@
 - [Kimi K2.5](https://togetherai.link/) for the LLM
 - [Together AI](https://togetherai.link/) for LLM inference
 - [Sandpack](https://sandpack.codesandbox.io/) for the code sandbox
-- [S3](https://aws.amazon.com/s3/) for image storage
+- Browser localStorage for local testing and persistence
+- [S3](https://aws.amazon.com/s3/) for production image storage
 - Next.js app router with Tailwind
 - Helicone for observability
 - Plausible for website analytics
@@ -21,8 +22,9 @@
 
 1. Clone the repo: `git clone https://github.com/Nutlope/napkins`
 2. Create a `.env` file and add your [Together AI API key](https://togetherai.link/llama3.2vision/?utm_source=example-app&utm_medium=napkins&utm_campaign=napkins-app-signup): `TOGETHER_API_KEY=`
-3. Create an S3 bucket and add the credentials to your `.env` file. Follow [this guide](https://next-s3-upload.codingvalue.com/setup) to set them up. All required values are in the `.env.example` file.
-4. Run `npm install` and `npm run dev` to install dependencies and run locally
+3. Run `npm install` and `npm run dev` to install dependencies and run locally.
+4. For local testing, upload a file or use the built-in demo image. The app stores the image and generated output in the browser so refreshes do not clear your test state.
+5. Add S3 credentials only when you are ready to deploy the production image upload flow.
 
 ## Future Tasks
 
