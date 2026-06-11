@@ -88,6 +88,47 @@ function clearWorkspace() {
   }
 }
 
+async function uploadImageFile(file: File) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch('/api/blob-upload', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    let errorMsg = response.statusText || 'Upload failed';
+    try {
+      const errBody = await response.json();
+      errorMsg = errBody?.error || errBody?.message || errorMsg;
+    } catch {
+      try {
+        errorMsg = await response.text();
+      } catch {}
+    }
+    throw new Error(errorMsg);
+  }
+
+  const blob = (await response.json()) as { url?: string };
+  if (!blob.url) {
+    throw new Error('Upload succeeded but no URL was returned');
+  }
+
+  return blob.url;
+}
+
+async function fileToDataUrl(file: File) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      resolve(event.target?.result as string);
+    };
+    reader.onerror = () => reject(new Error('Failed to read file locally'));
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function UploadComponent() {
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
   let [status, setStatus] = useState<
@@ -146,22 +187,42 @@ export default function UploadComponent() {
     }
   }, [thinkingText]);
 
-  const handleFileChange = (file: File) => {
+  const handleFileChange = async (file: File) => {
     setStatus('uploading');
     setThinkingText('');
     setGeneratedCode('');
     setError(null);
 
-    // Store image locally using data URL (no S3). The data URL is kept in
-    // component state (browser memory) and sent directly to the backend for
-    // vision inference. Works for both preview and Together AI image_url.
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const dataUrl = event.target?.result as string;
-      setImageUrl(dataUrl);
+    try {
+      const blobUrl = await uploadImageFile(file);
+      setImageUrl(blobUrl);
       setStatus('uploaded');
-    };
-    reader.readAsDataURL(file);
+    } catch (blobError) {
+      if (process.env.NODE_ENV !== 'production') {
+        try {
+          const dataUrl = await fileToDataUrl(file);
+          setImageUrl(dataUrl);
+          setStatus('uploaded');
+          setError(null);
+          return;
+        } catch (fallbackError) {
+          setError(
+            fallbackError instanceof Error
+              ? fallbackError.message
+              : 'Could not store the uploaded image locally'
+          );
+          setStatus('initial');
+          return;
+        }
+      }
+
+      setError(
+        blobError instanceof Error
+          ? blobError.message
+          : 'Could not upload the image'
+      );
+      setStatus('initial');
+    }
   };
 
   async function createApp() {

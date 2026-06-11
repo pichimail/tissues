@@ -10,6 +10,7 @@
 import Together from "together-ai";
 import * as esbuild from "esbuild";
 import * as fs from "fs";
+import * as path from "path";
 import { getCodingPrompt } from "../lib/prompt";
 import { stripFences } from "../lib/code-utils";
 
@@ -20,8 +21,8 @@ const PROD_MODELS = [
   "MiniMaxAI/MiniMax-M2.5",
 ];
 
-const IMAGE_URL =
-  "https://napkinsdev.s3.us-east-1.amazonaws.com/next-s3-uploads/be191fc8-149b-43eb-b434-baf883986c2c/appointment-booking.png";
+const IMAGE_PATH = path.join(process.cwd(), "public/control-panel-demo.png");
+const IMAGE_URL = `data:image/png;base64,${fs.readFileSync(IMAGE_PATH).toString("base64")}`;
 const RUNS = parseInt(process.argv[2] || "3", 10);
 const SINGLE_MODEL = process.argv[3];
 const MODELS = SINGLE_MODEL ? [SINGLE_MODEL] : PROD_MODELS;

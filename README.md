@@ -13,7 +13,7 @@
 - [Together AI](https://togetherai.link/) for LLM inference
 - [Sandpack](https://sandpack.codesandbox.io/) for the code sandbox
 - Browser localStorage for local testing and persistence
-- [S3](https://aws.amazon.com/s3/) for production image storage
+- [Vercel Blob](https://vercel.com/docs/vercel-blob) for production image storage
 - Next.js app router with Tailwind
 - Helicone for observability
 - Plausible for website analytics
@@ -24,7 +24,7 @@
 2. Create a `.env` file and add your [Together AI API key](https://togetherai.link/llama3.2vision/?utm_source=example-app&utm_medium=napkins&utm_campaign=napkins-app-signup): `TOGETHER_API_KEY=`
 3. Run `npm install` and `npm run dev` to install dependencies and run locally.
 4. For local testing, upload a file or use the built-in demo image. The app stores the image and generated output in the browser so refreshes do not clear your test state.
-5. Add S3 credentials only when you are ready to deploy the production image upload flow.
+5. For production uploads on Vercel, create a Blob store in the project Storage tab. Vercel will add `BLOB_READ_WRITE_TOKEN` automatically; for local runs you can pull it with `vercel env pull`.
 
 ## Future Tasks
 

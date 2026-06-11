@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Toaster } from '@/components/ui/sonner';
 import { TwitterLogoIcon } from '@radix-ui/react-icons';
 import PlausibleProvider from 'next-plausible';
 
@@ -81,6 +82,7 @@ export default function RootLayout({
             </Button>
           </div>
         </footer>
+        <Toaster />
       </body>
     </html>
   );
