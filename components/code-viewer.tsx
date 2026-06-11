@@ -11,7 +11,58 @@ import { aquaBlue } from "@codesandbox/sandpack-themes";
 // import { githubLight } from "@codesandbox/sandpack-themes";
 
 import dedent from "dedent";
+import React from "react";
 import "./code-viewer.css";
+
+class PreviewErrorBoundary extends React.Component<
+  { children: React.ReactNode; code: string },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // Errors from bad generated App.tsx (syntax, invalid element, etc.) are expected in this tool.
+    // Log at debug level only to avoid noisy user consoles.
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("Sandpack preview error (from generated App.tsx):", error, errorInfo);
+    }
+  }
+
+  componentDidUpdate(prevProps: { children: React.ReactNode; code: string }) {
+    // When parent supplies a new/different code, clear previous error so a
+    // successful regeneration or version switch auto-recovers the preview.
+    if (prevProps.code !== this.props.code) {
+      this.setState({ hasError: false, error: undefined });
+    }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full w-full items-center justify-center p-6 bg-white">
+          <div className="max-w-md text-center">
+            <div className="text-red-600 font-semibold mb-2">Preview failed to render</div>
+            <p className="text-sm text-gray-600 mb-4">
+              The generated code has a syntax error or produced an invalid React element.
+              This can happen with partial streams or unusual model output.
+            </p>
+            <p className="text-xs text-gray-500">
+              Use <span className="font-medium">Download</span> to inspect the code, or regenerate / refine with an edit prompt.
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export default function CodeViewer({
   code,
@@ -20,7 +71,7 @@ export default function CodeViewer({
   code: string;
   showEditor?: boolean;
 }) {
-  return showEditor ? (
+  const content = showEditor ? (
     <Sandpack
       options={{
         showNavigator: true,
@@ -29,7 +80,7 @@ export default function CodeViewer({
         ...sharedOptions,
       }}
       files={{
-        "App.tsx": code,
+        "App.tsx": code || "// App will appear here after generation",
         ...sharedFiles,
       }}
       {...sharedProps}
@@ -37,7 +88,7 @@ export default function CodeViewer({
   ) : (
     <SandpackProvider
       files={{
-        "App.tsx": code,
+        "App.tsx": code || "export default function App() { return <div />; }",
         ...sharedFiles,
       }}
       className="flex h-full w-full grow flex-col justify-center"
@@ -51,6 +102,8 @@ export default function CodeViewer({
       />
     </SandpackProvider>
   );
+
+  return <PreviewErrorBoundary code={code}>{content}</PreviewErrorBoundary>;
 }
 
 const sharedProps = {

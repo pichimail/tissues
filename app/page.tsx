@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/tooltip';
 import LoadingDots from '@/components/loading-dots';
 import { readStream } from '@/lib/utils';
-import { stripFences } from '@/lib/code-utils';
+import { stripFences, autoClose } from '@/lib/code-utils';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
@@ -183,6 +183,11 @@ export default function UploadComponent() {
   const [thinkingText, setThinkingText] = useState('');
   const [hydrated, setHydrated] = useState(false);
 
+  // Stable code for Sandpack preview. We only update this with complete,
+  // post-cleaned code so the embedded sandbox never sees mid-stream partial
+  // syntax (the source of the "invalid element type" + babel unterminated string errors).
+  const [sandpackCode, setSandpackCode] = useState<string>('');
+
   // Version history
   const [versions, setVersions] = useState<Version[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<number | null>(null);
@@ -217,6 +222,9 @@ export default function UploadComponent() {
         const toShow = loadedVersions.find((v) => v.id === loadedSelected)?.code ??
           loadedVersions[loadedVersions.length - 1].code;
         setGeneratedCode(toShow);
+        setSandpackCode(toShow);
+      } else if (snapshot.generatedCode) {
+        setSandpackCode(snapshot.generatedCode);
       }
 
       setStatus(
@@ -271,6 +279,7 @@ export default function UploadComponent() {
     setStatus('uploading');
     setThinkingText('');
     setGeneratedCode('');
+    setSandpackCode('');
     setError(null);
 
     try {
@@ -393,9 +402,12 @@ export default function UploadComponent() {
         accumulated += codeBufferRef.current;
         codeBufferRef.current = '';
       }
-      let finalCode = stripFences(accumulated);
+      // Use autoClose (stripFences + stripPostamble + brace repair) so we feed
+      // Sandpack a syntactically complete file whenever possible.
+      let finalCode = autoClose(accumulated);
 
       setGeneratedCode(finalCode);
+      setSandpackCode(finalCode);
       setStatus('created');
 
       // Commit to version history
@@ -439,10 +451,12 @@ export default function UploadComponent() {
     setStatus('uploading');
     setThinkingText('');
     setGeneratedCode('');
+    setSandpackCode('');
     setError(null);
     setVersions([]);
     setSelectedVersionId(null);
     setEditPromptText('');
+    setSandpackCode('');
     setTheme(DEFAULT_THEME);
 
     // Load the demo image from the local public folder and convert it to a
@@ -471,6 +485,7 @@ export default function UploadComponent() {
     if (v) {
       setSelectedVersionId(versionId);
       setGeneratedCode(v.code);
+      setSandpackCode(v.code);
     }
   }
 
@@ -480,6 +495,7 @@ export default function UploadComponent() {
     if (v) {
       setSelectedVersionId(versionId);
       setGeneratedCode(v.code);
+      setSandpackCode(v.code);
       // Focus the edit box
       setTimeout(() => editTextareaRef.current?.focus(), 60);
     }
@@ -531,7 +547,11 @@ export default function UploadComponent() {
           )}
 
           <div className="relative flex-1 isolate">
-            <CodeViewer code={displayedCode} showEditor />
+            {/* Use a stable sandpackCode (last successfully completed + cleaned output)
+                while generating. This prevents the sandbox from ever seeing
+                mid-object / mid-string partial TSX that caused the React "Element type is invalid"
+                crashes and the babel-transpiler syntax errors in the console logs. */}
+            <CodeViewer code={loading ? sandpackCode : displayedCode} showEditor />
 
             {status === 'creating' && (
               <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm">
@@ -587,6 +607,7 @@ export default function UploadComponent() {
                 setImageUrl(undefined);
                 setStatus('initial');
                 setGeneratedCode('');
+                setSandpackCode('');
                 setThinkingText('');
                 setShadcn(false);
                 setTheme(DEFAULT_THEME);
@@ -811,6 +832,7 @@ export default function UploadComponent() {
               clearWorkspace();
               setImageUrl(undefined);
               setGeneratedCode('');
+              setSandpackCode('');
               setThinkingText('');
               setError(null);
               setShadcn(false);
