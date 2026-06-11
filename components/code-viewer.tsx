@@ -71,6 +71,7 @@ export default function CodeViewer({
   code: string;
   showEditor?: boolean;
 }) {
+  const sandboxCode = normalizeSandboxImports(code);
   const content = showEditor ? (
     <Sandpack
       options={{
@@ -80,7 +81,7 @@ export default function CodeViewer({
         ...sharedOptions,
       }}
       files={{
-        "App.tsx": code || "// App will appear here after generation",
+        "App.tsx": sandboxCode || "// App will appear here after generation",
         ...sharedFiles,
       }}
       {...sharedProps}
@@ -88,7 +89,7 @@ export default function CodeViewer({
   ) : (
     <SandpackProvider
       files={{
-        "App.tsx": code || "export default function App() { return <div />; }",
+        "App.tsx": sandboxCode || "export default function App() { return <div />; }",
         ...sharedFiles,
       }}
       className="flex h-full w-full grow flex-col justify-center"
@@ -104,6 +105,12 @@ export default function CodeViewer({
   );
 
   return <PreviewErrorBoundary code={code}>{content}</PreviewErrorBoundary>;
+}
+
+function normalizeSandboxImports(source: string) {
+  return source
+    .replace(/from\s+(['"])@\/([^'"]+)\1/g, 'from $1/$2$1')
+    .replace(/import\s+(['"])@\/([^'"]+)\1/g, 'import $1/$2$1');
 }
 
 const sharedProps = {

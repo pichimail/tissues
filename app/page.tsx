@@ -365,11 +365,17 @@ export default function UploadComponent() {
       if (!res.body) throw new Error('No response body');
 
       codeBufferRef.current = '';
+      let streamedCode = '';
+
+      const flushBufferedCode = () => {
+        if (!codeBufferRef.current) return;
+        streamedCode += codeBufferRef.current;
+        codeBufferRef.current = '';
+        setGeneratedCode(streamedCode);
+      };
+
       let flushInterval = setInterval(() => {
-        if (codeBufferRef.current) {
-          setGeneratedCode((prev) => prev + codeBufferRef.current);
-          codeBufferRef.current = '';
-        }
+        flushBufferedCode();
       }, 240);
 
       for await (let chunk of readStream(res.body)) {
@@ -391,20 +397,11 @@ export default function UploadComponent() {
       }
 
       clearInterval(flushInterval);
-      if (codeBufferRef.current) {
-        setGeneratedCode((prev) => prev + codeBufferRef.current);
-        codeBufferRef.current = '';
-      }
+      flushBufferedCode();
 
-      // Build final from the live buffer + last state update (state may lag)
-      let accumulated = generatedCode;
-      if (codeBufferRef.current) {
-        accumulated += codeBufferRef.current;
-        codeBufferRef.current = '';
-      }
       // Use autoClose (stripFences + stripPostamble + brace repair) so we feed
       // Sandpack a syntactically complete file whenever possible.
-      let finalCode = autoClose(accumulated);
+      let finalCode = autoClose(streamedCode);
 
       setGeneratedCode(finalCode);
       setSandpackCode(finalCode);
